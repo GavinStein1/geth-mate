@@ -6,9 +6,12 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"os"
 	"strings"
 
 	"gethmate/eth"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type Graph struct {
@@ -130,20 +133,24 @@ func (g *Graph) TrimNodes(threshold big.Float) {
 	queue.PushBack(src)
 	visited := make(map[*Node]bool)
 	visited[src] = true
-
+	i := 1
 	for queue.Len() > 0 {
+		fmt.Printf("Iteration %d\n", i)
+		i += 1
 		// Get current node
 		current := queue.Front().Value.(*Node)
 		queue.Remove(queue.Front())
+		fmt.Printf("Edges: %d\n", len(current.Edges))
+		j := 0
 		for _, edge := range current.Edges {
-			fmt.Println(edge.Pool.ContractAddress.String())
+			fmt.Printf("Edge %d\n", j)
+			j += 1
 			var neighbor *Node
 			if strings.EqualFold(current.Token.ContractAddress.String(), edge.Start.Token.ContractAddress.String()) {
 				neighbor = edge.Dest
 			} else {
 				neighbor = edge.Start
 			}
-			fmt.Println(neighbor.Token.ContractAddress.String())
 			if !visited[neighbor] {
 				visited[neighbor] = true
 				price := edge.Pool.GetPrice(current.Token.ContractAddress.String())
@@ -155,15 +162,10 @@ func (g *Graph) TrimNodes(threshold big.Float) {
 					price.SetInt64(-1)
 				}
 				reservesF.Quo(reservesF, &price)
-				fmt.Println(reservesF)
-				fmt.Println(&threshold)
 				if reservesF.Cmp(&threshold) == -1 {
 					// Remove edge and set price to -1 so that remaining edges are marked for removal
-					fmt.Println("Removing edge")
 					g.RemoveEdge(edge)
 					price_in_eth[neighbor].SetInt64(-1)
-					fmt.Println(len(g.Nodes))
-					fmt.Println(len(g.Edges))
 				} else {
 					price_in_eth[neighbor].Mul(price_in_eth[current], &price)
 					queue.PushBack(neighbor)
@@ -171,5 +173,46 @@ func (g *Graph) TrimNodes(threshold big.Float) {
 			}
 		}
 	}
+	// Print addresses of nodes that are still in graph to file
+	file, err := os.OpenFile("addresses.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println("Failed to open file")
+	}
+	defer file.Close()
+	for _, edge := range g.Edges {
+		file.WriteString(edge.Pool.ContractAddress.String() + "\n")
+	}
+	err = file.Sync()
+	if err != nil {
+		log.Println("Failed to write to file")
+	}
 	fmt.Println("Trimmed graph")
+}
+
+func (g *Graph) UpdateAllEdges(client *ethclient.Client) {
+	numRoutines := 24
+	ch := make(chan int, numRoutines)
+	keys := make([]string, 0, len(g.Edges))
+	for key := range g.Edges {
+		keys = append(keys, key)
+	}
+	for i := 0; i < numRoutines; i++ {
+		start := i * int(len(g.Edges)) / numRoutines
+		end := (i + 1) * int(len(g.Edges)) / numRoutines
+		go g.updateEdges(client, keys, start, end, ch)
+	}
+
+	// Wait for all goroutines to finish
+	for i := 0; i < numRoutines; i++ {
+		<-ch
+	}
+}
+
+func (g *Graph) updateEdges(client *ethclient.Client, keys []string, start, end int, ch chan int) {
+
+	for i := start; i < end; i++ {
+		edge := g.Edges[keys[i]]
+		edge.Pool.UpdateReserves(client)
+	}
+	ch <- 1
 }

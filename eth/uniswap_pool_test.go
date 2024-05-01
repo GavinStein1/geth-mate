@@ -3,6 +3,7 @@ package eth
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -16,7 +17,7 @@ func TestUniswapPool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
-	tokens := make(map[string]*ERC20Token)
+	var tokens = &sync.Map{}
 	pool.Initialize(client, tokens)
 	if !strings.EqualFold(pool.Token0.ContractAddress.String(), "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2") {
 		t.Errorf("Expected 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2, got %s", pool.Token0.ContractAddress.String())

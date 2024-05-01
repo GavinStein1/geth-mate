@@ -47,7 +47,8 @@ func main() {
 
 	// Get uniswap pools
 	fmt.Printf("Starting GethMate.\nTimestamp: %s\n", time.Now())
-	fmt.Println("Getting all Uniswap pools from factory. This may take some time...")
+	fmt.Println("Getting all Uniswap pools. This may take some time...")
+	// allPools := eth.GetUniswapPools()
 	allPools := eth.GetUniswapPools(client)
 
 	// Create graph
@@ -62,23 +63,22 @@ func main() {
 	// Trim away low liquidity pools
 	// To do this, we can run algorithm to get liquidity value in Eth and
 	// remove nodes and their edges that are below a threshold.
+	// Only required if pools are fetched directly from factory and not from a saved file (TAKES AGES...)
 	if args["trim"] {
 		fmt.Println("Trimming data structure.")
 		graph.TrimNodes(*new(big.Float).SetInt64(30))
 	}
 	fmt.Println(len(graph.Nodes))
 	fmt.Println(len(graph.Edges))
-	return
+
 	for {
 		select {
 		case err := <-sub.Err():
 			log.Fatal(err)
 		case header := <-headers:
 			fmt.Println("New block:", header.Number.String())
-			for i, pool := range allPools {
-				pool.UpdateReserves(client)
-				fmt.Println(i)
-			}
+			graph.UpdateAllEdges(client) // Update edge weights for new block
+			fmt.Println("Done block")
 		}
 	}
 

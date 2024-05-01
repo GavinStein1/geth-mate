@@ -30,7 +30,7 @@ func NewERC20Token(contractAddress common.Address) *ERC20Token {
 }
 
 func (t *ERC20Token) Initialize(client *ethclient.Client) {
-	jsonBytes, err := os.ReadFile("TokenERC20.json")
+	jsonBytes, err := os.ReadFile("eth/TokenERC20.json")
 	if err != nil {
 		log.Fatalf("Failed to read TokenERC20.json: %v", err)
 	}

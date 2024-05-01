@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"sync"
 
 	"gethmate/utils"
 
@@ -31,7 +32,7 @@ func NewUniswapPool(contractAddress string) *UniswapPool {
 	}
 }
 
-func (u *UniswapPool) Initialize(client *ethclient.Client, tokens map[string]*ERC20Token) {
+func (u *UniswapPool) Initialize(client *ethclient.Client, tokens *sync.Map) {
 	// Token0 address
 	callMsg := ethereum.CallMsg{
 		To:   &u.ContractAddress,
@@ -45,7 +46,7 @@ func (u *UniswapPool) Initialize(client *ethclient.Client, tokens map[string]*ER
 		return
 	}
 	t0Addr := common.HexToAddress(hex.EncodeToString(result))
-	t0, exists := tokens[t0Addr.String()]
+	t0, exists := tokens.Load(strings.ToLower(t0Addr.String()))
 	if !exists {
 		u.Token0 = NewERC20Token(t0Addr)
 		u.Token0.Initialize(client)
@@ -53,9 +54,9 @@ func (u *UniswapPool) Initialize(client *ethclient.Client, tokens map[string]*ER
 			log.Printf("Failed to initialise token0 %s\n", t0Addr.String())
 			return
 		}
-		tokens[t0Addr.String()] = u.Token0
+		tokens.Store(strings.ToLower(t0Addr.String()), u.Token0)
 	} else {
-		u.Token0 = t0
+		u.Token0 = t0.(*ERC20Token)
 	}
 
 	// Token1 address
@@ -67,7 +68,7 @@ func (u *UniswapPool) Initialize(client *ethclient.Client, tokens map[string]*ER
 		return
 	}
 	t1Addr := common.HexToAddress(hex.EncodeToString(result))
-	t1, exists := tokens[t1Addr.String()]
+	t1, exists := tokens.Load(strings.ToLower(t1Addr.String()))
 	if !exists {
 		u.Token1 = NewERC20Token(t1Addr)
 		u.Token1.Initialize(client)
@@ -75,9 +76,9 @@ func (u *UniswapPool) Initialize(client *ethclient.Client, tokens map[string]*ER
 			log.Printf("Failed to initialise token1 %s\n", t1Addr.String())
 			return
 		}
-		tokens[t1Addr.String()] = u.Token1
+		tokens.Store(strings.ToLower(t0Addr.String()), u.Token0)
 	} else {
-		u.Token1 = t1
+		u.Token1 = t1.(*ERC20Token)
 	}
 
 	// Reserves
