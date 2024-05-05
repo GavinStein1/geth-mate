@@ -115,66 +115,73 @@ func (g *Graph) RemoveEdge(edge *Edge) {
 	}
 }
 
+func (g *Graph) RemoveNode(node *Node) {
+	for _, edge := range node.Edges {
+		g.RemoveEdge(edge)
+	}
+}
+
 func (g *Graph) TrimNodes(threshold big.Float) {
 	src, exists := g.Nodes["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"] // Hardcoded WETH contract on Eth mainnet
 	if !exists {
 		log.Fatalln("WETH not found in graph")
 	}
 
-	// Modified Breadth-First Search (BFS) for trimming
-	price_in_eth := make(map[*Node]*big.Float)
+	for _, edge := range src.Edges {
+		var reserves *big.Float
+		decimals := new(big.Float).SetInt64(int64(math.Pow10(src.Token.Decimals)))
+		if strings.EqualFold(src.Token.ContractAddress.String(), edge.Start.Token.ContractAddress.String()) {
+			reserves = new(big.Float).SetInt(edge.Pool.Reserve0)
+		} else {
+			reserves = new(big.Float).SetInt(edge.Pool.Reserve1)
+		}
 
-	// Initialize distances and predecessors
-	for _, node := range g.Nodes {
-		price_in_eth[node] = big.NewFloat(math.Inf(1))
+		reserves.Quo(reserves, decimals)
+		if reserves.Cmp(&threshold) == -1 {
+			g.RemoveEdge(edge)
+		}
 	}
-	price_in_eth[src] = big.NewFloat(1)
+
+	// Trim graph with edges removed
+	visited := make(map[*Node]bool)
+	for _, node := range g.Nodes {
+		visited[node] = false
+	}
+	// BFS to find reachable nodes
+	// Delete nodes that have an edge length of 1
 	queue := list.New()
 	queue.PushBack(src)
-	visited := make(map[*Node]bool)
-	visited[src] = true
-	i := 1
+
 	for queue.Len() > 0 {
-		fmt.Printf("Iteration %d\n", i)
-		i += 1
 		// Get current node
 		current := queue.Front().Value.(*Node)
 		queue.Remove(queue.Front())
-		fmt.Printf("Edges: %d\n", len(current.Edges))
-		j := 0
+		if len(current.Edges) < 2 {
+			g.RemoveNode(current)
+		} else {
+			visited[current] = true
+		}
 		for _, edge := range current.Edges {
-			fmt.Printf("Edge %d\n", j)
-			j += 1
-			var neighbor *Node
 			if strings.EqualFold(current.Token.ContractAddress.String(), edge.Start.Token.ContractAddress.String()) {
-				neighbor = edge.Dest
-			} else {
-				neighbor = edge.Start
-			}
-			if !visited[neighbor] {
-				visited[neighbor] = true
-				price := edge.Pool.GetPrice(current.Token.ContractAddress.String())
-				reserves := edge.Pool.GetReservesFromTokenContract(neighbor.Token.ContractAddress.String())
-				reservesF := new(big.Float).SetInt(&reserves)
-				reservesF.Quo(reservesF, big.NewFloat(math.Pow10(neighbor.Token.Decimals)))
-				if price.Cmp(big.NewFloat(0)) == 0 {
-					// setting the price to negative 1 will render reservesF < 0 < threshold
-					price.SetInt64(-1)
+				if !visited[edge.Dest] {
+					queue.PushBack(edge.Dest)
 				}
-				reservesF.Quo(reservesF, &price)
-				if reservesF.Cmp(&threshold) == -1 {
-					// Remove edge and set price to -1 so that remaining edges are marked for removal
-					g.RemoveEdge(edge)
-					price_in_eth[neighbor].SetInt64(-1)
-				} else {
-					price_in_eth[neighbor].Mul(price_in_eth[current], &price)
-					queue.PushBack(neighbor)
+			} else {
+				if !visited[edge.Start] {
+					queue.PushBack(edge.Start)
 				}
 			}
 		}
 	}
+
+	// Iterate through map and remove unvisited nodes
+	for key, val := range visited {
+		if !val {
+			g.RemoveNode(key)
+		}
+	}
 	// Print addresses of nodes that are still in graph to file
-	file, err := os.OpenFile("addresses.txt", os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile("dev_addresses.txt", os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Println("Failed to open file")
 	}
@@ -215,4 +222,23 @@ func (g *Graph) updateEdges(client *ethclient.Client, keys []string, start, end 
 		edge.Pool.UpdateReserves(client)
 	}
 	ch <- 1
+}
+
+func (g *Graph) PrintGraph() {
+	for _, node := range g.Nodes {
+		fmt.Printf("Token address: %s\n", node.Token.ContractAddress.String())
+		fmt.Printf("Edges %d\n", len(node.Edges))
+		for _, edge := range node.Edges {
+			fmt.Printf("%s\n", edge.Pool.ContractAddress.String())
+		}
+	}
+}
+
+func (g *Graph) Strategy() {
+	src, exists := g.Nodes["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"] // Hardcoded WETH contract on Eth mainnet
+	if !exists {
+		log.Fatalln("WETH not found in graph")
+	}
+
+	fmt.Println(src.Token.ContractAddress.String())
 }

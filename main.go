@@ -57,28 +57,29 @@ func main() {
 	for _, pool := range allPools {
 		graph.AddEdge(&pool)
 	}
-	fmt.Println(len(graph.Nodes))
-	fmt.Println(len(graph.Edges))
 
 	// Trim away low liquidity pools
 	// To do this, we can run algorithm to get liquidity value in Eth and
 	// remove nodes and their edges that are below a threshold.
-	// Only required if pools are fetched directly from factory and not from a saved file (TAKES AGES...)
+	// (TAKES AGES...)
 	if args["trim"] {
 		fmt.Println("Trimming data structure.")
-		graph.TrimNodes(*new(big.Float).SetInt64(30))
+		graph.TrimNodes(*new(big.Float).SetInt64(300))
 	}
-	fmt.Println(len(graph.Nodes))
-	fmt.Println(len(graph.Edges))
 
 	for {
 		select {
 		case err := <-sub.Err():
 			log.Fatal(err)
 		case header := <-headers:
-			fmt.Println("New block:", header.Number.String())
-			graph.UpdateAllEdges(client) // Update edge weights for new block
-			fmt.Println("Done block")
+			blockNumber := header.Number
+			fmt.Println("New block:", blockNumber.String())
+
+			// Update edge weights for new block
+			graph.UpdateAllEdges(client)
+
+			// Find arbitrage path
+			graph.Strategy()
 		}
 	}
 

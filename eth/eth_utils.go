@@ -15,7 +15,7 @@ import (
 )
 
 func GetUniswapPools(client *ethclient.Client) []UniswapPool {
-	filename := "addresses.txt"
+	filename := "prod_addresses.txt"
 	addresses, err := utils.ReadAddressesFromFile(filename)
 	if err != nil {
 		log.Fatalf("Failed to read addresses from file: %v", err)

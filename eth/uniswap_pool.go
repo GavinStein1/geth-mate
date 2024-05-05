@@ -106,36 +106,36 @@ func (u UniswapPool) GetK() big.Int {
 	return *new(big.Int).Mul(u.Reserve0, u.Reserve1)
 }
 
-func (u UniswapPool) GetToken0Price() big.Float {
+func (u UniswapPool) GetToken0Price() *big.Float {
 	if u.Reserve0.Cmp(big.NewInt(0)) == 0 || u.Reserve1.Cmp(big.NewInt(0)) == 0 {
-		return *big.NewFloat(0)
+		return big.NewFloat(0)
 	}
 	priceRatio := new(big.Float).Quo(new(big.Float).SetInt(u.Reserve1), new(big.Float).SetInt(u.Reserve0))
 	priceRatio.Mul(priceRatio, big.NewFloat(math.Pow10(u.Token0.Decimals-u.Token1.Decimals)))
-	return *priceRatio
+	return priceRatio
 }
 
-func (u UniswapPool) GetToken1Price() big.Float {
+func (u UniswapPool) GetToken1Price() *big.Float {
 	if u.Reserve0.Cmp(big.NewInt(0)) == 0 || u.Reserve1.Cmp(big.NewInt(0)) == 0 {
-		return *big.NewFloat(0)
+		return big.NewFloat(0)
 	}
 	priceRatio := new(big.Float).Quo(new(big.Float).SetInt(u.Reserve0), new(big.Float).SetInt(u.Reserve1))
 	priceRatio.Mul(priceRatio, big.NewFloat(math.Pow10(u.Token1.Decimals-u.Token0.Decimals)))
-	return *priceRatio
+	return priceRatio
 }
 
-func (u UniswapPool) GetPrice(tokenIn string) big.Float {
+func (u UniswapPool) GetPrice(tokenIn string) *big.Float {
 	if strings.EqualFold(tokenIn, u.Token0.ContractAddress.String()) {
 		return u.GetToken0Price()
 	} else if strings.EqualFold(tokenIn, u.Token1.ContractAddress.String()) {
 		return u.GetToken1Price()
 	} else {
 		log.Println("Token not in pool")
-		return big.Float{}
+		return &big.Float{}
 	}
 }
 
-func (u UniswapPool) GetToken1Out(token0Amount big.Int) big.Float {
+func (u UniswapPool) GetToken1Out(token0Amount big.Int) *big.Float {
 	r0f := new(big.Float).SetInt(u.Reserve0)
 	r1f := new(big.Float).SetInt(u.Reserve1)
 	token0Amountf := new(big.Float).SetInt(&token0Amount)
@@ -145,10 +145,10 @@ func (u UniswapPool) GetToken1Out(token0Amount big.Int) big.Float {
 	k.Quo(k, denominator)
 
 	result := new(big.Float).Sub(r1f, k)
-	return *result
+	return result
 }
 
-func (u UniswapPool) GetToken0Out(token1Amount big.Int) big.Float {
+func (u UniswapPool) GetToken0Out(token1Amount big.Int) *big.Float {
 	r0f := new(big.Float).SetInt(u.Reserve0)
 	r1f := new(big.Float).SetInt(u.Reserve1)
 	token1Amountf := new(big.Float).SetInt(&token1Amount)
@@ -158,17 +158,17 @@ func (u UniswapPool) GetToken0Out(token1Amount big.Int) big.Float {
 	k.Quo(k, denominator)
 
 	result := new(big.Float).Sub(r0f, k)
-	return *result
+	return result
 }
 
-func (u UniswapPool) GetTokenAmountOut(tokenIn ERC20Token, amountIn big.Int) big.Float {
+func (u UniswapPool) GetTokenAmountOut(tokenIn ERC20Token, amountIn big.Int) *big.Float {
 	if strings.EqualFold(tokenIn.ContractAddress.String(), u.Token0.ContractAddress.String()) {
 		return u.GetToken1Out(amountIn)
 	} else if strings.EqualFold(tokenIn.ContractAddress.String(), u.Token1.ContractAddress.String()) {
 		return u.GetToken0Out(amountIn)
 	} else {
 		log.Fatalf("Token %s is not in pool %s", tokenIn.ContractAddress, u.ContractAddress)
-		return big.Float{}
+		return &big.Float{}
 	}
 }
 
