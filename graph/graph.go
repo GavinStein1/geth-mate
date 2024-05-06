@@ -234,11 +234,70 @@ func (g *Graph) PrintGraph() {
 	}
 }
 
-func (g *Graph) Strategy() {
+func (g *Graph) Strategy(startAmountIn *big.Float) []*Edge {
 	src, exists := g.Nodes["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"] // Hardcoded WETH contract on Eth mainnet
 	if !exists {
 		log.Fatalln("WETH not found in graph")
 	}
 
-	fmt.Println(src.Token.ContractAddress.String())
+	dist := make(map[*Node]*big.Float)
+	prev := make(map[*Node][]*Edge)
+	for _, node := range g.Nodes {
+		dist[node] = new(big.Float).SetInt64(0)
+		prev[node] = make([]*Edge, 0)
+	}
+
+	dist[src] = startAmountIn
+	prev[src] = make([]*Edge, 0)
+
+	// Bellman ford algorithm to traverse graph
+	for _, node := range g.Nodes {
+		for _, edge := range node.Edges {
+			// If there is a distance to edge.Start, then we can update the distance to edge.Dest
+			if distIn, exists := dist[edge.Start]; exists {
+				// Calculate distance to edge.Dest
+				distOut := new(big.Float).Mul(distIn, edge.Pool.GetPrice(edge.Start.Token.ContractAddress.String()))
+				if distOut.Cmp(dist[edge.Dest]) == 1 {
+					// Only update if edge is not already in prev[edge.Start], otherwise we are going in cycles
+					flag := false
+					for _, prevEdge := range prev[edge.Start] {
+						if edge == prevEdge {
+							flag = true
+							break
+						}
+					}
+					if !flag {
+						dist[edge.Dest] = distOut
+						prev[edge.Dest] = append(prev[edge.Start], edge)
+					}
+				}
+			}
+			// IF there is a distance to edge.Dest, then we can update the distance to edge.Start
+			if distIn, exists := dist[edge.Dest]; exists {
+				// Calculate distance to edge.Start
+				distOut := new(big.Float).Mul(distIn, edge.Pool.GetPrice(edge.Dest.Token.ContractAddress.String()))
+				if distOut.Cmp(dist[edge.Start]) == 1 {
+					// Only update if edge is not already in prev[edge.Start], otherwise we are going in cycles
+					flag := false
+					for _, prevEdge := range prev[edge.Dest] {
+						if edge == prevEdge {
+							flag = true
+							break
+						}
+					}
+					if !flag {
+						dist[edge.Start] = distOut
+						prev[edge.Start] = append(prev[edge.Dest], edge)
+					}
+				}
+			}
+		}
+	}
+
+	// If dist[src] > startAmountIn, then profitable path exists, return prev[src]
+	if dist[src].Cmp(startAmountIn) == 1 {
+		return prev[src]
+	} else {
+		return make([]*Edge, 0)
+	}
 }

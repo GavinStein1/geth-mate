@@ -106,6 +106,7 @@ func (u UniswapPool) GetK() big.Int {
 	return *new(big.Int).Mul(u.Reserve0, u.Reserve1)
 }
 
+// Get price of token0 in token1
 func (u UniswapPool) GetToken0Price() *big.Float {
 	if u.Reserve0.Cmp(big.NewInt(0)) == 0 || u.Reserve1.Cmp(big.NewInt(0)) == 0 {
 		return big.NewFloat(0)
@@ -115,6 +116,7 @@ func (u UniswapPool) GetToken0Price() *big.Float {
 	return priceRatio
 }
 
+// Get price of token1 in token0
 func (u UniswapPool) GetToken1Price() *big.Float {
 	if u.Reserve0.Cmp(big.NewInt(0)) == 0 || u.Reserve1.Cmp(big.NewInt(0)) == 0 {
 		return big.NewFloat(0)

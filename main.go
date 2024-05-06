@@ -66,6 +66,7 @@ func main() {
 		fmt.Println("Trimming data structure.")
 		graph.TrimNodes(*new(big.Float).SetInt64(300))
 	}
+	startAmountIn := new(big.Float).SetFloat64(0.1)
 
 	for {
 		select {
@@ -79,8 +80,7 @@ func main() {
 			graph.UpdateAllEdges(client)
 
 			// Find arbitrage path
-			graph.Strategy()
+			graph.Strategy(startAmountIn)
 		}
 	}
-
 }
